@@ -1,130 +1,115 @@
-import cryptography
-from cryptography.fernet import Fernet
-import hashlib
-import base64
-import json as js
-import os
-def hash_password(message):
-  
-  hash_hex = hashlib.sha256(message.encode()).hexdigest()
-  return hash_hex
-  
-def verify_password(text, hash):
-  if hash_password(text) == hash:
-    return True
-  else: return False
+```markdown
+# Local Password Manager
 
-def generate_key(master_password):
- master_password = base64.urlsafe_b64encode(hashlib.sha256(master_password.encode()).digest())
- return master_password
-  
+## Description
+This project is a lightweight, command-line interface (CLI) password manager written in Python. It allows users to securely store, view, and delete website credentials locally. To guarantee privacy and data protection, credentials are encrypted before being written to disk, ensuring that your raw passwords are never stored in plain text. Access to the system is restricted by a hashed master password created during the first setup.
 
-class PasswordManager():
-  def __init__(self):
-    self.passwords = []
+---
 
-  def add(self, master_password):
-    website = input('Type in your website: ')
-    name = input('Type in your name: ')
-    password = input('Type in your password: ')
-    key = generate_key(master_password)
-    f = Fernet(key)
-    password = f.encrypt(password.encode()) 
-    to_dict = {
-      'website': website, 'name': name, 'password': password
-    }
-    self.passwords.append(to_dict)
-    
-  def view(self, master_password):
-    key = generate_key(master_password)
-    f = Fernet(key)
-    for entry in self.passwords:
-      decrypted_password = f.decrypt(entry['password'])
-      print(entry['website'], entry['name'], decrypted_password.decode())
+## Tech Stack
+* **Language:** Python 3.x
+* **Encryption & Security:**
+  * `cryptography` (specifically `Fernet` for symmetric encryption)
+  * `hashlib` (SHA-256 for password hashing and key derivation)
+  * `base64` (for URL-safe encryption key formatting)
+* **Storage & Environment:**
+  * `json` (for managing local database file serialization)
+  * `os` (for file existence handling)
 
-    
-  def delete(self):
-    website = input("Type in the website you'd like to delete: ")
-    found = False
-    for i in self.passwords:
-      if website == i['website']:
-        self.passwords.remove(i)
-        found = True
-    if not found:
-      print('Website Not Found')
+---
 
-def setup_master_password():
-  master_psw = input('Please create a master password: ')
-  hashed_master = hash_password(master_psw)
-  with open('master.txt', 'w') as f:
-    f.write(hashed_master)
- 
-def verify_master_password():
-  verify_psw = input('Please provide the master password: ')
-  with open('master.txt', 'r') as f:
-    stored_hash = f.read()
-  if verify_password(verify_psw, stored_hash):
-    return verify_psw
-  else: 
-    return None
-  
+## How To Use
 
-def save_passwords(password_manager):
-  data = []
-  for p in password_manager.passwords:
-    data.append({'website': p['website'], 'name': p['name'], 'password': p['password'].decode()})
-  with open('passwords.json', 'w') as f:
-      js.dump(data, f)
+### 1. Prerequisites
+Ensure you have Python installed, then install the required dependency via your terminal:
+```bash
+pip install cryptography
+
+```
+
+### 2. Initialization & Setup
+
+Run the main script from your terminal:
+
+```bash
+python main.py
+
+```
+
+* **First Run (Setup):** The application will detect that no master key exists and prompt you:
+```text
+Please create a master password: 
+
+```
 
 
-def load_passwords():
-  password_manager = PasswordManager()
-  with open('passwords.json', 'r') as f:
-    content = js.load(f)
-    for p in content:
-     password_manager.passwords.append(({'website': p['website'], 'name': p['name'], 'password': p['password'].encode()}))
-    return password_manager 
-  
+Type your desired master password and press `Enter`. The script will generate a secure hash, save it to `master.txt`, and exit.
+* **Subsequent Runs (Login):** Launch the script again. You will be prompted to authenticate:
+```text
+Please provide the master password:
 
-while True:
-  if not os.path.exists("master.txt"):
-    setup_master_password()
-    break
-  else:
-    master_password = verify_master_password()
-    if master_password:
-      break
-    else:
-      print('Wrong password')
+```
 
-try:
-  manager = load_passwords()
-except FileNotFoundError:
-  manager = PasswordManager()
 
-while True:
-  try:
-    menu = int(input(""" 
-    Menu:
-    1: Add
-    2: View
-    3: Delete
-    4: Quit
-    """))
-    if menu == 1:
-      manager.add(master_password)
-      save_passwords(manager)
+Input your password. If it matches, the interactive menu will open. If it is incorrect, you will see `Wrong password` and the application will terminate.
 
-    elif menu == 2:
-      manager.view(master_password)
-  
+### 3. Navigation & Operations
 
-    elif menu == 3:
-      manager.delete()
-      save_passwords(manager)
-    elif menu <1 or menu >4:
-      print("You can only choose from 1 to 4")
+Once authenticated, use the numerical interactive menu to manage your credentials:
 
-    elif menu == 4:
-      break
-  except Exception as e : print(e)
+* **Option 1: Add a Credential**
+Select `1` to encrypt and store a new entry. Follow the interactive prompts:
+```text
+Type in your website: example.com
+Type in your name: john_doe
+Type in your password: super_secret_password
+
+```
+
+
+The password is automatically encrypted using your master key and appended to your local database file (`passwords.json`).
+* **Option 2: View Credentials**
+Select `2` to read your records. The application will decrypt your saved passwords on-the-fly and output them in plain text:
+```text
+example.com john_doe super_secret_password
+
+```
+
+
+* **Option 3: Delete a Credential**
+Select `3` to remove an entry from your records:
+```text
+Type in the website you'd like to delete: example.com
+
+```
+
+
+If the website matches an entry in your database, it is removed, and the local file updates automatically. If no match is found, it will print `Website Not Found`.
+* **Option 4: Quit**
+Select `4` to safely exit the interface.
+
+---
+
+## Features
+
+* **Secure Credential Encryption:** Passwords are never written to disk in plain text. They are protected using Fernet symmetric encryption, ensuring that anyone inspecting your database directly sees only ciphertext.
+* **Local Data Persistence:** Keeps your data entirely in your possession. Your data is managed through a lightweight local `passwords.json` file in the project directory.
+* **Zero-Knowledge Master Authentication:** The application uses SHA-256 hashing to verify your identity. Your raw master password is never stored; only its cryptographic signature is saved in `master.txt`.
+* **Dynamic Record Updates:** Automatically synchronizes additions and removals back to your local JSON storage without locking or damaging the file structure.
+
+---
+
+## A Note About Security
+
+> [!WARNING]
+> **Educational/Basic Utility Disclaimer**
+> While this application successfully implements fundamental cryptographic libraries, it is built for educational or simple script purposes. Note these security behaviors if you intend to store critical real-world accounts:
+> * **Basic Key Derivation:** The encryption key is derived using a simple, direct SHA-256 hash of your master password. Standard password managers utilize specialized, time-and-memory-hard key derivation functions (like *PBKDF2* or *Argon2*) to actively throttle brute-force attacks.
+> * **Local Asset Security:** The encrypted payloads (`passwords.json`) and authentication proof (`master.txt`) sit unprotected in your local working directory. If an unauthorized user gains access to your operating system or files, they can copy your database and try to brute-force your master key offline.
+> * **Strict Value Matching:** Deletion relies on string matching with the exact `website` tag provided during entry creation. Ensure consistent naming to keep your data organized.
+> 
+> 
+
+```
+
+```
